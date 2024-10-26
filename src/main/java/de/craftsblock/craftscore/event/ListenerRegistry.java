@@ -1,89 +1,173 @@
 package de.craftsblock.craftscore.event;
 
 import de.craftsblock.craftscore.utils.Utils;
+import org.jetbrains.annotations.ApiStatus;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+/**
+ * The {@link ListenerRegistry} class is responsible for managing event listeners
+ * and dispatching events to registered handlers in an event-driven system. It
+ * maintains a mapping of event types to listener methods and ensures that events
+ * are handled in the correct order based on their {@link EventPriority}.
+ *
+ * <p>This class allows listeners to register and unregister event handler methods
+ * dynamically. It also supports event queuing for deferred event dispatch.</p>
+ *
+ * <p>The registry uses reflection to detect and invoke methods annotated with
+ * {@link EventHandler} in the provided listener objects.</p>
+ *
+ * <p><b>Inspired by:</b> <a href="https://hub.spigotmc.org/stash/projects/SPIGOT/repos/bukkit/browse/src/main/java/org/bukkit/event">Bukkit's Event System</a></p>
+ *
+ * @author Philipp Maywald
+ * @author CraftsBlock
+ * @version 2.0.0
+ * @since 3.6.16-SNAPSHOT
+ */
 public class ListenerRegistry {
 
-    private final ConcurrentHashMap<String, ConcurrentLinkedQueue<Listener>> data = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Class<? extends Event>, EnumMap<EventPriority, List<Listener>>> data = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Short, ConcurrentLinkedQueue<Event>> channelQueues = new ConcurrentHashMap<>();
 
+    /**
+     * Registers an event listener. All methods in the provided {@code ListenerAdapter}
+     * object annotated with {@link EventHandler} are registered to handle events.
+     *
+     * @param adapter The listener containing event handler methods.
+     */
     public void register(ListenerAdapter adapter) {
         for (Method method : Utils.getMethodsByAnnotation(adapter.getClass(), EventHandler.class))
             try {
                 if (method.getParameterCount() <= 0)
                     throw new IllegalStateException("The methode " + method.getName() + " is provided with " + EventHandler.class.getName() + " but does not include " + Event.class.getName() + " as argument!");
+
                 Class<?> parameter = method.getParameters()[0].getType();
                 if (!Event.class.isAssignableFrom(parameter))
                     throw new IllegalStateException("The methode " + method.getName() + " is provided with " + EventHandler.class.getName() + " but does not include " + Event.class.getName() + " as argument!");
+
+                Class<? extends Event> event = parameter.asSubclass(Event.class);
                 EventHandler eventHandler = method.getAnnotation(EventHandler.class);
-                ConcurrentLinkedQueue<Listener> tmp = data.getOrDefault(parameter.getName(), new ConcurrentLinkedQueue<>());
-                tmp.add(new Listener(method, adapter, eventHandler.priority()));
-                data.put(parameter.getName(), tmp);
+                data.computeIfAbsent(event, p -> new EnumMap<>(EventPriority.class))
+                        .computeIfAbsent(eventHandler.priority(), e -> new ArrayList<>())
+                        .add(new Listener(method, adapter, eventHandler.priority()));
             } catch (Exception e) {
                 e.printStackTrace();
             }
     }
 
+    /**
+     * Unregisters an event listener, removing all of its registered event handler methods
+     * from the registry.
+     *
+     * @param adapter The listener whose event handlers should be unregistered.
+     */
     public void unregister(ListenerAdapter adapter) {
         for (Method method : Utils.getMethodsByAnnotation(adapter.getClass(), EventHandler.class))
             try {
                 if (method.getParameterCount() <= 0)
                     throw new IllegalStateException("The methode " + method.getName() + " is provided with " + EventHandler.class.getName() + " but does not include " + Event.class.getName() + " as argument!");
+
                 Class<?> parameter = method.getParameters()[0].getType();
                 if (!Event.class.isAssignableFrom(parameter))
                     throw new IllegalStateException("The methode " + method.getName() + " is provided with " + EventHandler.class.getName() + " but does not include " + Event.class.getName() + " as argument!");
+
+                Class<? extends Event> event = parameter.asSubclass(Event.class);
                 EventHandler eventHandler = method.getAnnotation(EventHandler.class);
-                ConcurrentLinkedQueue<Listener> tmp = data.getOrDefault(parameter.getName(), new ConcurrentLinkedQueue<>());
-                tmp.removeIf(listener -> (listener.method.equals(method) && listener.priority.equals(eventHandler.priority())));
-                data.put(parameter.getName(), tmp);
+                if (!data.containsKey(event)) continue;
+
+                EnumMap<EventPriority, List<Listener>> listeners = data.get(event);
+                if (!listeners.containsKey(eventHandler.priority())) continue;
+                listeners.get(eventHandler.priority()).removeIf(listener -> listener.method().equals(method));
+
+                // Remove the event priority if there are no left listeners
+                if (listeners.get(eventHandler.priority()).isEmpty())
+                    listeners.remove(eventHandler.priority());
+                else
+                    // Continue as there are more listeners remaining
+                    continue;
+
+                // Remove the event type if no listeners are left
+                if (listeners.isEmpty()) data.remove(event);
             } catch (Exception e) {
                 e.printStackTrace();
             }
     }
 
+    /**
+     * Calls the event by invoking all registered listeners for the given event type
+     * in order of their {@link EventPriority}.
+     *
+     * @param event The event to be dispatched.
+     * @throws InvocationTargetException If the listener method cannot be invoked.
+     * @throws IllegalAccessException    If the listener method is inaccessible.
+     */
     public void call(Event event) throws InvocationTargetException, IllegalAccessException {
-        if (!this.data.containsKey(event.getClass().getName()))
+        if (!this.data.containsKey(event.getClass()))
             return;
 
-        ConcurrentLinkedQueue<Listener> data = new ConcurrentLinkedQueue<>(List.of(this.data.get(event.getClass().getName()).toArray(new Listener[0])));
-        EventPriority next = EventPriority.LOWEST;
-        while (next != null) {
-            if (data.isEmpty()) break;
+        EnumMap<EventPriority, List<Listener>> data = this.data.get(event.getClass());
+        if (data.isEmpty()) return;
 
-            for (Listener tile : data)
-                if (tile.priority == next) {
-                    tile.method.invoke(tile.self, event);
-                    data.remove(tile);
-                }
+        for (EventPriority priority : data.keySet()) {
+            List<Listener> listeners = data.get(priority);
+            if (listeners.isEmpty()) continue;
 
-            next = EventPriority.next(next);
+            for (Listener tile : listeners)
+                tile.method.invoke(tile.self, event);
         }
     }
 
+    /**
+     * Queues an event for deferred processing in the default channel (channel 0).
+     *
+     * @param event The event to be queued.
+     */
     public void queueCall(Event event) {
         queueCall((short) 0, event);
     }
 
+    /**
+     * Queues an event for deferred processing in a specified channel.
+     *
+     * @param channel The channel ID to queue the event in.
+     * @param event   The event to be queued.
+     */
     public void queueCall(Short channel, Event event) {
         channelQueues.computeIfAbsent(channel, i -> new ConcurrentLinkedQueue<>()).add(event);
     }
 
+    /**
+     * Processes and dispatches all queued events in the default channel (channel 0).
+     *
+     * @throws InvocationTargetException If a listener method cannot be invoked.
+     * @throws IllegalAccessException    If a listener method is inaccessible.
+     */
     public void callQueued() throws InvocationTargetException, IllegalAccessException {
         callQueued((short) 0);
     }
 
+    /**
+     * Processes and dispatches all queued events across all channels.
+     *
+     * @throws InvocationTargetException If a listener method cannot be invoked.
+     * @throws IllegalAccessException    If a listener method is inaccessible.
+     */
     public void callAllQueued() throws InvocationTargetException, IllegalAccessException {
         for (Short channel : channelQueues.keySet())
             callQueued(channel);
     }
 
+    /**
+     * Processes and dispatches all queued events in a specific channel.
+     *
+     * @param channel The channel ID to process queued events from.
+     * @throws InvocationTargetException If a listener method cannot be invoked.
+     * @throws IllegalAccessException    If a listener method is inaccessible.
+     */
     public void callQueued(Short channel) throws InvocationTargetException, IllegalAccessException {
         if (!channelQueues.containsKey(channel)) return;
 
@@ -96,6 +180,14 @@ public class ListenerRegistry {
         if (queue.isEmpty()) channelQueues.remove(channel);
     }
 
+    /**
+     * Internal record representing a registered listener.
+     *
+     * @param method   The method to be invoked for the event.
+     * @param self     The instance of the listener object.
+     * @param priority The priority of the event handler.
+     */
+    @ApiStatus.Internal
     private record Listener(Method method, Object self, EventPriority priority) {
     }
 

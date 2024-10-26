@@ -1,7 +1,6 @@
 package de.craftsblock.craftscore.json;
 
 import com.google.gson.*;
-import com.google.gson.reflect.TypeToken;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -10,7 +9,6 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
@@ -19,8 +17,9 @@ import java.util.stream.Collectors;
 /**
  * The Json class represents a json object and provides methods to work with json data.
  *
+ * @author Philipp Maywald
  * @author CraftsBlock
- * @version 2.0
+ * @version 2.0.6
  * @see JsonParser
  * @since 3.6#16-SNAPSHOT
  */
@@ -184,7 +183,31 @@ public final class Json {
      * @return The JsonElement at the given path, or null if the path does not exist.
      */
     public JsonElement getOrDefault(String path, JsonElement fallback) {
-        return get(path) != null ? get(path) : fallback;
+        JsonElement element = get(path);
+        return element != null ? element : fallback;
+    }
+
+    /**
+     * Retrieves the JsonElement at the specified path in the json data and returns it as a new instance of {@link Json}.
+     *
+     * @param path The path to the data in the json data.
+     * @return The {@link Json} at the given path, or null if the path does not exist.
+     */
+    public Json getJson(String path) {
+        return getJson(path, null);
+    }
+
+    /**
+     * Retrieves the JsonElement at the specified path in the json data and returns it as a new instance of {@link Json}.
+     * If no data is associated with the path, a fallback data value is returned.
+     *
+     * @param path     The path to the data in the json data.
+     * @param fallback The fallback data to return if no data is associated with the path
+     * @return The {@link Json} at the given path, or the fallback value if the path does not exist.
+     */
+    public Json getJson(String path, Json fallback) {
+        JsonElement element = get(path);
+        return element != null ? JsonParser.parse(element) : fallback;
     }
 
     /**
@@ -260,20 +283,41 @@ public final class Json {
     }
 
     /**
+     * Retrieves a list of {@link JsonElement} at the specified path in the json data.
+     *
+     * @param path The path to the list of strings in the json data.
+     * @return A Collection of {@link JsonElement} at the given path, or an empty list if the path does not exist.
+     */
+    public Collection<JsonElement> getList(String path) {
+        JsonElement element = get(path);
+        if (element != null && element.isJsonArray())
+            return new ArrayList<>(element.getAsJsonArray().asList());
+        return new ArrayList<>();
+    }
+
+    /**
+     * Retrieves a list of {@link Json} at the specified path in the json data.
+     *
+     * @param path The path to the list of strings in the json data.
+     * @return A Collection of {@link Json} at the given path, or an empty list if the path does not exist.
+     */
+    public Collection<Json> getJsonList(String path) {
+        return getList(path).stream().map(JsonParser::parse).toList();
+    }
+
+    /**
      * Retrieves a list of strings at the specified path in the json data.
      *
      * @param path The path to the list of strings in the json data.
      * @return A Collection of strings at the given path, or an empty list if the path does not exist or the value is not a json array of strings.
      */
     public Collection<String> getStringList(String path) {
-        JsonElement element = get(path);
-        if (element != null && element.isJsonArray()) {
-            Collection<String> list = new ArrayList<>();
-            for (JsonElement arrayElement : element.getAsJsonArray())
-                if (arrayElement.isJsonPrimitive()) list.add(arrayElement.getAsString());
-            return list;
-        }
-        return new ArrayList<>();
+        ArrayList<String> list = new ArrayList<>();
+
+        for (JsonElement arrayElement : getList(path))
+            if (arrayElement.isJsonPrimitive()) list.add(arrayElement.getAsString());
+
+        return list;
     }
 
     /**
@@ -286,21 +330,18 @@ public final class Json {
      */
     @SuppressWarnings("unchecked")
     public <T extends Number> Collection<T> getNumberList(String path, Class<T> type) {
-        JsonElement element = get(path);
-        if (element != null && element.isJsonArray()) {
-            Collection<T> list = new ArrayList<>();
-            for (JsonElement arrayElement : element.getAsJsonArray())
-                if (arrayElement.isJsonPrimitive()) {
-                    try {
-                        Number num = arrayElement.getAsNumber();
-                        list.add((T) num.getClass().getDeclaredMethod(type + "Value").invoke(num));
-                    } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-                        throw new RuntimeException(e);
-                    }
+        Collection<T> list = new ArrayList<>();
+
+        for (JsonElement arrayElement : getList(path))
+            if (arrayElement.isJsonPrimitive())
+                try {
+                    Number num = arrayElement.getAsNumber();
+                    list.add((T) num.getClass().getDeclaredMethod(type + "Value").invoke(num));
+                } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+                    throw new RuntimeException(e);
                 }
-            return list;
-        }
-        return new ArrayList<>();
+
+        return list;
     }
 
     /**
@@ -393,70 +434,108 @@ public final class Json {
      */
     private void setJson(String path, JsonElement data) {
         String[] args = path.split("\\.");
-
+        JsonElement destination = getObject();
         StringBuilder processedPath = new StringBuilder();
-        JsonElement temp = getObject();
 
         for (int i = 0; i < args.length - 1; i++) {
             String arg = args[i].replace("&dot;", ".");
+            boolean array = arg.startsWith("$");
+            if (destination.isJsonNull())
+                destination = initPath(processedPath.toString(), array);
 
-            String currentProcessed = processedPath.toString().isEmpty() ? "" : ".";
-            if (temp.isJsonArray() || (temp.isJsonNull() && arg.startsWith("$"))) {
-                if (!arg.startsWith("$"))
-                    throw new IllegalStateException("The index of an array must start with an $ char!");
+            String nextArg = args[i + 1];
+            if (array) {
+                int index = argumentToIndex(arg, destination.getAsJsonArray(), true);
+                destination = getOrCreate(destination.getAsJsonArray(), index, nextArg.startsWith("$"));
+                processedPath.append("$").append(index);
+            } else {
+                destination = getOrCreate(destination.getAsJsonObject(), arg, nextArg.startsWith("$"));
+                processedPath.append(arg);
+            }
 
-                JsonArray array = temp.isJsonNull() ? new JsonArray() : temp.getAsJsonArray();
-                if (temp.isJsonNull())
-                    if (getObject().isJsonNull()) object = array;
-                    else setJson(processedPath.toString(), array);
-
-                int index = argumentToIndex(arg, array, true);
-
-                JsonElement next;
-                if (index >= array.size()) next = JsonNull.INSTANCE;
-                else next = array.get(index);
-
-                temp = next;
-                processedPath.append(currentProcessed).append("$").append(Math.min(index, array.size()));
-            } else if (temp.isJsonObject() || (temp.isJsonNull() && !arg.startsWith("$"))) {
-                JsonObject object = temp.isJsonNull() ? new JsonObject() : temp.getAsJsonObject();
-                if (temp.isJsonNull())
-                    if (getObject().isJsonNull()) this.object = object;
-                    else setJson(processedPath.toString(), object);
-
-                JsonElement next;
-                if (!object.has(arg)) next = JsonNull.INSTANCE;
-                else next = object.get(arg);
-
-                temp = next;
-                processedPath.append(currentProcessed).append(arg);
-            } else throw new IllegalStateException("The value for the key \"" + arg + "\" is not a json object or array!");
+            if (i < args.length - 2) processedPath.append(".");
         }
 
+        // Handling for the last element in the path
         String lastArg = args[args.length - 1].replace("&dot;", ".");
         if (lastArg.startsWith("$")) {
-            JsonArray array = temp.isJsonNull() ? new JsonArray() : temp.getAsJsonArray();
-            if (temp.isJsonNull())
-                if (getObject().isJsonNull()) this.object = array;
-                else setJson(processedPath.toString(), array);
-
+            JsonArray array = destination.isJsonNull() ? new JsonArray() : destination.getAsJsonArray();
             int index = argumentToIndex(lastArg, array, true);
-
-            if (index >= array.size()) array.add(data);
+            if (index == array.size()) array.add(data);
             else array.set(index, data);
             return;
         }
 
-        JsonObject object = temp.isJsonNull() ? new JsonObject() : temp.getAsJsonObject();
-        if (temp.isJsonNull())
-            if (getObject().isJsonNull()) this.object = object;
-            else setJson(processedPath.toString(), object);
+        JsonObject obj = destination.isJsonNull() ? new JsonObject() : destination.getAsJsonObject();
+        obj.add(lastArg, data);
+    }
 
-        if (!object.has(lastArg)) object.add(lastArg, data);
-        else {
-            object.remove(lastArg);
-            object.add(lastArg, data);
+    /**
+     * Converts an argument to its index representation while respecting the allowance of new indexes.
+     *
+     * @param arg      The argument as its string representation.
+     * @param array    The json array for which the index is applied.
+     * @param allowNew {@code true} if new creation of new indexes is supported, {@code false} otherwise.
+     * @return The converted index.
+     */
+    private int argumentToIndex(String arg, JsonArray array, boolean allowNew) {
+        try {
+            if (arg.equalsIgnoreCase("$last")) return array.size() - 1;
+            else if (arg.equalsIgnoreCase("$new") && allowNew) return array.size();
+            return Integer.parseInt(arg.replace("$", ""));
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException("Not a valid array index! (" + arg + ")", e);
         }
+    }
+
+    /**
+     * Initializes a json path by setting up a new json element based on the specified path.
+     *
+     * @param path    the path within the json structure to initialize, as a string
+     * @param isArray {@code true} if the path should be initialized as a {@link JsonArray}, {@code false} for {@link JsonObject}
+     * @return the newly created {@link JsonElement} (either {@link JsonArray} or {@link JsonObject}) at the specified path
+     */
+    private JsonElement initPath(String path, boolean isArray) {
+        JsonElement element = isArray ? new JsonArray() : new JsonObject();
+        if (getObject().isJsonNull()) this.object = element;
+        else setJson(path, element);
+        return element;
+    }
+
+    /**
+     * Retrieves an existing property from a json object or creates a new one if it doesn't exist.
+     *
+     * @param obj      the {@link JsonObject} in which to retrieve or create the property
+     * @param property the name of the property to retrieve or create
+     * @param isArray  {@code true} if the property should be initialized as a {@link JsonArray}, {@code false} for {@link JsonObject}
+     * @return the existing or newly created {@link JsonElement} (either {@link JsonArray} or {@link JsonObject})
+     */
+    private JsonElement getOrCreate(JsonObject obj, String property, boolean isArray) {
+        if (!obj.has(property)) {
+            JsonElement newObject = isArray ? new JsonArray() : new JsonObject();
+            obj.add(property, newObject);
+            return newObject;
+        }
+        return obj.get(property);
+    }
+
+    /**
+     * Retrieves or creates an element within a json array at the specified index.
+     *
+     * @param array   the {@link JsonArray} in which to retrieve or create the element
+     * @param index   the index at which to retrieve or create the element
+     * @param isArray {@code true} if the element should be initialized as a {@link JsonArray}, {@code false} for {@link JsonObject}
+     * @return the existing or newly created {@link JsonElement} (either {@link JsonArray} or {@link JsonObject}) at the specified index
+     */
+    private JsonElement getOrCreate(JsonArray array, int index, boolean isArray) {
+        JsonElement element = index >= array.size() ? JsonNull.INSTANCE : array.get(index);
+        if (element.isJsonNull()) {
+            element = isArray ? new JsonArray() : new JsonObject();
+
+            if (index == array.size()) array.add(element);
+            else array.set(index, element);
+        }
+        return element;
     }
 
     /**
@@ -469,6 +548,12 @@ public final class Json {
         setJson(path, new JsonPrimitive(data));
     }
 
+    /**
+     * Sets a number value at the specified path in the json data.
+     *
+     * @param path The path where the string value should be set in the json data.
+     * @param data The string data to be set at the given path.
+     */
     private void setNumber(String path, Number data) {
         setJson(path, new JsonPrimitive(data));
     }
@@ -499,10 +584,12 @@ public final class Json {
         if (collection.isEmpty()) setEmptyList(path);
         for (Object o : collection) {
             if (o instanceof JsonElement) setJsonList(path, (Collection<JsonElement>) collection);
+            else if (o instanceof Json) setJsonList(path, ((Collection<Json>) collection).stream().map(Json::getObject).toList());
             else if (o instanceof String) setStringList(path, (Collection<String>) collection);
             else if (o instanceof Number) setNumberList(path, (Collection<Number>) collection);
             else if (o instanceof Boolean) setBoolList(path, (Collection<Boolean>) collection);
             else setStringList(path, collection.stream().map(Object::toString).toList());
+
             break;
         }
     }
@@ -513,13 +600,19 @@ public final class Json {
      * @param path The path where the empty json array should be set.
      */
     private void setEmptyList(String path) {
-        set(path, new JsonArray());
+        setJson(path, new JsonArray());
     }
 
+    /**
+     * Sets a collection of {@link JsonElement} at the specified path in the json data.
+     *
+     * @param path       The path where the string collection should be set in the json data.
+     * @param collection The collection of {@link JsonElement} to be set at the given path.
+     */
     private void setJsonList(String path, Collection<JsonElement> collection) {
         JsonArray array = new JsonArray();
         for (JsonElement item : collection) array.add(item);
-        set(path, array);
+        setJson(path, array);
     }
 
     /**
@@ -531,7 +624,7 @@ public final class Json {
     private void setStringList(String path, Collection<String> collection) {
         JsonArray array = new JsonArray();
         for (String item : collection) array.add(item);
-        set(path, array);
+        setJson(path, array);
     }
 
 
@@ -544,7 +637,7 @@ public final class Json {
     private void setNumberList(String path, Collection<Number> collection) {
         JsonArray array = new JsonArray();
         for (Number item : collection) array.add(item);
-        set(path, array);
+        setJson(path, array);
     }
 
     /**
@@ -556,7 +649,7 @@ public final class Json {
     private void setBoolList(String path, Collection<Boolean> collection) {
         JsonArray array = new JsonArray();
         for (boolean item : collection) array.add(item);
-        set(path, array);
+        setJson(path, array);
     }
 
     /**
@@ -609,21 +702,32 @@ public final class Json {
     }
 
     /**
-     * Converts an argument to its index representation while respecting the allowance of new indexes.
+     * Retrieves the size of the root json object or array.
      *
-     * @param arg      The argument as its string representation.
-     * @param array    The json array for which the index is applied.
-     * @param allowNew {@code true} if new creation of new indexes is supported, {@code false} otherwise.
-     * @return The converted index.
+     * @return the size of the root json object or array
+     * @throws NullPointerException  if the root json element does not exist
+     * @throws IllegalStateException if the root element is neither a JSON object nor a JSON array
      */
-    private int argumentToIndex(String arg, JsonArray array, boolean allowNew) {
-        try {
-            if (arg.equalsIgnoreCase("$last")) return array.size() - 1;
-            else if (arg.equalsIgnoreCase("$new") && allowNew) return array.size();
-            return Integer.parseInt(arg.replace("$", ""));
-        } catch (NumberFormatException e) {
-            throw new IllegalStateException("Not a valid array index! (" + arg + ")", e);
-        }
+    public int size() {
+        return size("");
+    }
+
+    /**
+     * Retrieves the size of the json object or array at the specified path.
+     *
+     * @param path the path within the json structure to the target element
+     * @return the size of the json object or array located at the specified path
+     * @throws NullPointerException  if there is no JSON element at the specified path
+     * @throws IllegalStateException if the target element is neither a JSON object nor a JSON array
+     */
+    public int size(String path) {
+        JsonElement element = get(path);
+        if (element == null) throw new NullPointerException("No such json element under " + path);
+
+        if (element.isJsonObject()) return element.getAsJsonObject().size();
+        if (element.isJsonArray()) return element.getAsJsonArray().size();
+
+        throw new IllegalStateException("Can not retrieve the values of " + element.getClass().getSimpleName());
     }
 
     /**
