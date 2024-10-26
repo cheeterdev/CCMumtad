@@ -6,8 +6,17 @@
 ## Info
 Mumtad is a modified Version of [the CraftsBlock CraftsCore.](https://github.com/CrAfTsArMy/CraftsCore) Mumtad is used internally to make the programming of our projects easier, it does not offer that much more than the original CraftCore. it is compatible with normal CraftsCore plugins and also with other plugins like MumtadJDA or MumtadMC 
 
+## Credits
+[Based on CraftsCore.](https://github.com/CrAfTsArMy/CraftsCore)
+
+Original Contributors:
+[Philipp](https://github.com/CrAfTsArMy) /
+[Vincenz](https://github.com/vinc3nz) /
+[xvcf](https://github.com/RafaeloxMC) /
+[Website](https://repo.craftsblock.de/#/releases/de/craftsblock/craftscore/CraftsCore)
+
 ## Installation
-We didnt edited the Craftscore yet, the Installation below is for [the unedited original CraftsCore.](https://github.com/CrAfTsArMy/CraftsCore) When we release the first version of our edited CraftsCore we will [announce it in our Discord Server.](https://dsc.gg/cheeter)
+We didnt updated the installation process yet, the Installation below is for [the unedited original CraftsCore.](https://github.com/CrAfTsArMy/CraftsCore) We will [announce in our Discord Server.](https://dsc.gg/cheeter) when we update it.
 
 ### Maven
 ```xml
