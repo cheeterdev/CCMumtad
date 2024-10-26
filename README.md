@@ -9,7 +9,7 @@ Mumtad is a modified Version of [the CraftsBlock CraftsCore.](https://github.com
 ## Credits
 [Based on CraftsCore.](https://github.com/CrAfTsArMy/CraftsCore)
 
-Original Contributors:
+Thanks to the original Contributors:
 [Philipp](https://github.com/CrAfTsArMy) /
 [Vincenz](https://github.com/vinc3nz) /
 [xvcf](https://github.com/RafaeloxMC) /
