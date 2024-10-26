@@ -1,6 +1,6 @@
 # CCMumtad
 ![CraftsCore](https://img.shields.io/badge/Based%20on-CraftsCore%20v3.7.59-SNAPSHOT)
-![License](https://img.shields.io/badge/License-AGPL%203.0-blue)
+![License](https://img.shields.io/badge/License-Apache%202.0-blue)
 ![Mumtad](https://img.shields.io/badge/Mumtad-1.0%20ALPHA-red)
 
 ## Info
