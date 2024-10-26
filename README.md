@@ -1,9 +1,12 @@
-# CraftsCore
+# CCMumtad
 ![CraftsCore](https://img.shields.io/badge/Based%20on-CraftsCore%20v3.7.59-SNAPSHOT)
 ![License](https://img.shields.io/badge/License-AGPL%203.0-blue)
-![Mumtad](https://img.shields.io/badge/Mumtad-Info%20below.-red)
+![Mumtad](https://img.shields.io/badge/Mumtad-1.0%20ALPHA-red)
 
-## Installation Info
+## Info
+Mumtad is a modified Version of [the CraftsBlock CraftsCore.](https://github.com/CrAfTsArMy/CraftsCore) Mumtad is used internally to make the programming of our projects easier, it does not offer that much more than the original CraftCore. it is compatible with normal CraftsCore plugins and also with other plugins like MumtadJDA or MumtadMC 
+
+## Installation
 We didnt edited the Craftscore yet, the Installation below is for [the unedited original CraftsCore.](https://github.com/CrAfTsArMy/CraftsCore) When we release the first version of our edited CraftsCore we will [announce it in our Discord Server.](https://dsc.gg/cheeter)
 
 ### Maven
