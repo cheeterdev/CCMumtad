@@ -1,4 +1,4 @@
-# CCMumtad
+# CraftsCoreMumtad
 ![CraftsCore](https://img.shields.io/badge/Based%20on-CraftsCore%20v3.7.62-SNAPSHOT)
 ![License](https://img.shields.io/badge/License-Apache%202.0-purple)
 ![Mumtad](https://img.shields.io/badge/Mumtad-1.0%20ALPHA-red)
@@ -16,41 +16,4 @@ Mumtad is a modified Version of [the CraftsBlock CraftsCore.](https://github.com
 [CraftsBlock (Website)](https://repo.craftsblock.de/#/releases/de/craftsblock/craftscore/CraftsCore)
 
 ## Installation
-We didnt updated the installation process yet, the Installation below is for [the unedited original CraftsCore.](https://github.com/CrAfTsArMy/CraftsCore) We will [announce in our Discord Server.](https://dsc.gg/cheeter) when we update it.
-
-### Maven
-```xml
-<repositories>
-  ...
-  <repository>
-    <id>craftsblock-releases</id>
-    <name>CraftsBlock Repositories</name>
-    <url>https://repo.craftsblock.de/releases</url>
-  </repository>
-</repositories>
-```
-```xml
-<dependencies>
-  ...
-  <dependency>
-    <groupId>de.craftsblock.craftscore</groupId>
-    <artifactId>CraftsCore</artifactId>
-    <version>X.X.X-SNAPSHOT</version>
-  </dependency>
-</dependencies>
-```
-
-### Gradle
-```gradle
-repositories {
-  ...
-  maven { url "https://repo.craftsblock.de/releases" }
-  mavenCentral()
-}
-```
-```gradle
-dependencies {
-  ...
-  implementation 'de.craftsblock.craftscore:CraftsCore:X.X.X-SNAPSHOT'
-}
-```
+We didnt updated the installation process yet. We will [announce in our Discord Server.](https://dsc.gg/cheeter) when we update it.
