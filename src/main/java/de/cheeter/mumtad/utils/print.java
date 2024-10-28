@@ -1,4 +1,4 @@
-package de.cheeter.mumtad.yakeo;
+package de.cheeter.mumtad.utils;
 
 /**
  @author Cheeter Development

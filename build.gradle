@@ -2,32 +2,29 @@ plugins {
     id 'java'
 }
 
-java {
-    withJavadocJar()
-    withSourcesJar()
-}
-
-group 'de.craftsblock.craftscore'
-version '3.7.62-SNAPSHOT'
-
 repositories {
     mavenCentral()
-}
-
-dependencies {
-    // https://mvnrepository.com/artifact/org.jetbrains/annotations
-    implementation 'org.jetbrains:annotations:24.1.0'
-
-    // https://mvnrepository.com/artifact/com.mysql/mysql-connector-j
-    implementation 'com.mysql:mysql-connector-j:9.0.0'
-
-    // https://mvnrepository.com/artifact/com.squareup.okhttp3/okhttp
-//    implementation 'com.squareup.okhttp3:okhttp:5.0.0-alpha.14'
-
-    // https://mvnrepository.com/artifact/com.google.code.gson/gson
-    implementation 'com.google.code.gson:gson:2.11.0'
+    maven { url 'https://jitpack.io' }
 
 }
 
-sourceCompatibility = JavaVersion.VERSION_16
-targetCompatibility = JavaVersion.VERSION_16
+// Globale Konfigurationen für Subprojekte
+subprojects {
+    apply plugin: 'java'
+
+    repositories {
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
+
+    // Globale Abhängigkeiten, die für alle Subprojekte gelten
+    dependencies {
+        implementation 'org.jetbrains:annotations:24.1.0'
+        implementation 'com.mysql:mysql-connector-j:9.0.0'
+        implementation 'com.google.code.gson:gson:2.11.0'
+    }
+
+    // Java-Version
+    sourceCompatibility = JavaVersion.VERSION_16
+    targetCompatibility = JavaVersion.VERSION_16
+}

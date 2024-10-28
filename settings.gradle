@@ -1,2 +1,3 @@
-rootProject.name = 'CraftsCore'
+rootProject.name = 'CraftsCoreMumtad'
+include 'de.cheeter', 'de.craftsblock'
 
