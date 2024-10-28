@@ -2,7 +2,7 @@ plugins {
     id 'java'
 }
 
-group 'de.craftsblock.craftscore' // Gruppe für dieses Modul
+group 'de.cheeter.mumtad' // Gruppe für dieses Modul
 version '1.0.0-ALPHA' // Versionsnummer für dieses Modul
 
 repositories {
